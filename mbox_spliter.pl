@@ -63,7 +63,7 @@ open(F,"<$mbox") or die "Could not open '$mbox' ($!)";
 while(<F>) { # foreach line
 	$line++;
 
-	if (/^From\s+-\s+\w{3}\s+\w{3}\s+\d{2}\s+\d{2}:\d{2}:\d{2}\s+(\d{4})$/i) {  # new message syntax : From - Mon Jan 05 08:37:43 2012
+	if (/^From\s+-\s+\w{3}\s+\w{3}\s+\d{2}\s+\d{2}:\d{2}:\d{2}\s+(\d{4})\b/i) {  # new message syntax : From - Mon Jan 05 08:37:43 2012
 		$total_message++;
 		my $year_message = $1;
 
@@ -71,7 +71,7 @@ while(<F>) { # foreach line
 			$total_moved_message++;
 			$ouput_mbox = "$mbox.sbd/$year_message";
 			mkdir "$mbox.sbd" or die "Could not create output directory '$mbox.sbd' ($!)" if !-d "$mbox.sbd" && !$dry_run;
-			printf "Found message on line %08d (%04d), moved to %s\n", $line , $year_message, $ouput_mbox unless $quiet;
+			printf "Found message on line %8d (%4d), moved to %s\n", $line , $year_message, $ouput_mbox unless $quiet;
 			$stats{$ouput_mbox}++;
 		} else {
 			$ouput_mbox = dirname($mbox).'/'.$uniqid
