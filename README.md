@@ -1,7 +1,9 @@
 # mbox_spliter
+--------------
 Split large mbox files (from hunderbird) into smaller one, class by year of the message
 
 # Usage
+-------
 Options :
 --mbox=<mbox_file>
 	The mbox file you want to inspect
@@ -13,9 +15,11 @@ Options :
 	Don't print anything
 
 # Examples
+----------
 %perl mbox_spliter.pl --dry-run --mbox=c:/Thunderbird/Mail/Inbox
 
 # Statistics
+------------
 At the end the script print some statitics about the job done
 
 -----------------Statistics-----------------
@@ -28,4 +32,3 @@ Moved    93 messages (25.3%)
             2 messages ( 0.5%) into c:/Thunderbird/Mail/Inbox.sbd/2011
            28 messages ( 7.6%) into c:/Thunderbird/Mail/Inbox.sbd/2013
             4 messages ( 1.1%) into c:/Thunderbird/Mail/Inbox.sbd/2010
-           
