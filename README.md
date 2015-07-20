@@ -7,6 +7,8 @@ Options :
 	The mbox file you want to inspect
 --dry-run
 	Do only a simulation, do not write anything
+--compact
+	Compact the mbox file (delete messages marked "deleted")
 --usage ou --help
 	Display this message
 --quiet
@@ -28,4 +30,3 @@ Moved    93 messages (25.3%)
             2 messages ( 0.5%) into c:/Thunderbird/Mail/Inbox.sbd/2011
            28 messages ( 7.6%) into c:/Thunderbird/Mail/Inbox.sbd/2013
             4 messages ( 1.1%) into c:/Thunderbird/Mail/Inbox.sbd/2010
-           
