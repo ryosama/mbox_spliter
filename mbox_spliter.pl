@@ -64,7 +64,7 @@ while(<F>) { # foreach line
 			printf "Found message on line %8d (%4d), moved to %s\n", $line , $year_message, $ouput_mbox unless $quiet;
 			$stats{$ouput_mbox}++;
 		} else {
-			$ouput_mbox = dirname($mbox).'/'.$uniqid
+			$ouput_mbox = dirname($mbox).'/'.$uniqid;
 		}
 
 		if ($last_output_mbox ne $ouput_mbox) {
@@ -84,7 +84,7 @@ while(<F>) { # foreach line
 		}
 	}
 	
-	$buffer .= $_  ; # put line into buffer
+	$buffer .= $_ ; # put line into buffer
 
 }
 close(OUTPUT) unless $dry_run;
@@ -104,4 +104,8 @@ unless ($quiet) {
 unless ($dry_run) {
 	unlink($mbox) 							or die "Could not delete '$mbox' ($!)";
 	move(dirname($mbox).'/'.$uniqid, $mbox) or die "Could not rename '$uniqid' into '$mbox' ($!)";
+
+	# clean up index .msf file
+	printf "Remove '$mbox.msf' index file\n" unless $quiet;
+	unlink("$mbox.msf") or warn "Unable to remove '$mbox.msf' ($!)";
 }
