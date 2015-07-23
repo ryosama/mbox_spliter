@@ -1,5 +1,6 @@
 #!/usr/bin/perl
 
+use 5.010;
 use strict;
 use Getopt::Long;				# manage options
 use File::Basename;				# dirname()
@@ -19,7 +20,6 @@ my $uniqid 	= luniqid;
 # options
 my ($mbox,$dry_run,$compact,$help,$quiet);
 GetOptions('mbox=s'=>\$mbox, 'dry-run!'=>\$dry_run, 'compact!'=>\$compact, 'help|usage!'=>\$help, 'quiet!'=>\$quiet) ;
-die "Option --mbox=<mbox_file> is needed" unless length($mbox)>0;
 die <<EOT if ($help);
 Options :
 --mbox=<mbox_file>
@@ -34,14 +34,20 @@ Options :
 	Don't print anything
 EOT
 
+# some check
+die "Option --mbox=<mbox_file> is needed" 	unless length($mbox)>0;
+die "Unable to find $mbox file" 			unless -e $mbox;
+
 # main program
+my $mbox_size = (stat($mbox))[7];
 my $buffer = ''; # buffer for current message
 my $skip_message = 0;
 my $ouput_mbox = dirname($mbox).'/'.$uniqid;
 my $last_output_mbox = '';
-my $line = 0 ;
 my ($total_message,$total_moved_message,$total_deleted_message) = (0,0,0);
 my %stats = ();
+my $current_size_read = 0;
+my $line = 0 ;
 
 open(OUTPUT,">>$ouput_mbox") or die "Could not write into '$ouput_mbox' ($!)" unless $dry_run; 
 open(F,"<$mbox") or die "Could not open '$mbox' ($!)";
@@ -61,10 +67,9 @@ while(<F>) { # foreach line
 			$total_moved_message++;
 			$ouput_mbox = "$mbox.sbd/$year_message";
 			mkdir "$mbox.sbd" or die "Could not create output directory '$mbox.sbd' ($!)" if !-d "$mbox.sbd" && !$dry_run;
-			printf "Found message on line %8d (%4d), moved to %s\n", $line , $year_message, $ouput_mbox unless $quiet;
 			$stats{$ouput_mbox}++;
 		} else {
-			$ouput_mbox = dirname($mbox).'/'.$uniqid
+			$ouput_mbox = dirname($mbox).'/'.$uniqid;
 		}
 
 		if ($last_output_mbox ne $ouput_mbox) {
@@ -72,6 +77,17 @@ while(<F>) { # foreach line
 				close(OUTPUT);
 				open(OUTPUT,">>$ouput_mbox") or die "Could not write into '$ouput_mbox' ($!)";
 			}
+		}
+
+		# print some stats and progress bar
+		draw_progress_bar($current_size_read, $mbox_size) unless $quiet;
+	}
+
+	if ($compact && /^X-Mozilla-Status:\s+(\d+)/i) { # check status of the message
+		my $status = hex("0x$1");
+		if ($status & MSG_FLAG_EXPUNGED) { # mark "deleted"
+			$skip_message = 1;
+			$total_deleted_message++;
 		}
 	}
 
@@ -84,11 +100,14 @@ while(<F>) { # foreach line
 		}
 	}
 	
-	$buffer .= $_  ; # put line into buffer
-
+	$buffer .= $_ ; # put line into buffer
+	$current_size_read += length($_);
 }
 close(OUTPUT) unless $dry_run;
 close F;
+
+# print some stats and progress bar
+draw_progress_bar($mbox_size, $mbox_size) unless $quiet;
 
 unless ($quiet) {
 	printf "\n-----------------Statistics-----------------\n";
@@ -104,4 +123,31 @@ unless ($quiet) {
 unless ($dry_run) {
 	unlink($mbox) 							or die "Could not delete '$mbox' ($!)";
 	move(dirname($mbox).'/'.$uniqid, $mbox) or die "Could not rename '$uniqid' into '$mbox' ($!)";
+
+	# clean up index .msf file
+	if (-e "$mbox.msf") {
+		printf "Remove '$mbox.msf' index file\n" unless $quiet;
+		unlink("$mbox.msf") or warn "Unable to remove '$mbox.msf' ($!)";
+	}
+}
+
+
+sub draw_progress_bar($$) {
+	# first parameter is current value
+	# second paramater is total value
+	my ($pg_current,$pg_total) = @_;
+	
+	state $cursors_loop = 0;
+	use constant CURSORS => ('-',"\\",'|','/');
+	use constant PROGRESSBAR_SIZE => 20;
+
+	my $pourcent	= $pg_current * 100 / $pg_total;
+	my $pgb_size	= int($pourcent * PROGRESSBAR_SIZE / 100);
+	printf "\r[".('#' x $pgb_size).((CURSORS)[$cursors_loop]).('-' x (PROGRESSBAR_SIZE - $pgb_size - 1)).	#progress bar
+				'] %0.1f%%  %.01f/%.01f Mb | %d Msg, %d Moved, %d Deleted', # some stats
+				 $pourcent, $pg_current/1048576, $pg_total/1048576, $total_message, $total_moved_message, $total_deleted_message;
+
+	# change cursor aspect
+	if ($cursors_loop >= 3) { $cursors_loop=0; }
+	else 					{ $cursors_loop++; }
 }
