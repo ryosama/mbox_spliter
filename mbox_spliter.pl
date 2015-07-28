@@ -94,7 +94,6 @@ while(<F>) { # foreach line
 	if ($compact && /^X-Mozilla-Status:\s+(\d+)/i) { # check status of the message
 		my $status = hex("0x$1");
 		if ($status & MSG_FLAG_EXPUNGED) { # mark "deleted"
-			printf "Found message to delete on line %8d\n", $line unless $quiet;
 			$skip_message = 1;
 			$total_deleted_message++;
 		}
