@@ -1,31 +1,32 @@
 # mbox_spliter
 --------------
-Split large mbox files (from hunderbird) into smaller one, class by year of the message
+Split large mbox files (from Mozilla Thunderbird) into smaller one
 
 # Usage
 -------
 Options :
-
---mbox=<mbox_file>
-
-	The mbox file you want to inspect
+--mbox=<mbox_file> (required)
+  The mbox file you want to inspect
 
 --dry-run
+  Do only a simulation, do not write anything
 
-	Do only a simulation, do not write anything
+--compact
+  Compact the mbox file (delete messages marked as "deleted")
+
+--split-by=year|mounth|week|day
+  Split the mbox file into separate files
 
 --usage ou --help
-
-	Display this message
+  Display this message
 
 --quiet
-
-	Don't print anything
+  Don't print anything
 
 
 # Examples
 ----------
-`perl mbox_spliter.pl --dry-run --mbox=c:/Thunderbird/Mail/Inbox`
+`perl mbox_spliter.pl --dry-run --mbox=c:/Thunderbird/Mail/Inbox` --compact --split-by=year
 
 # Statistics
 ------------

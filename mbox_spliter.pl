@@ -4,8 +4,9 @@ use 5.010;
 use strict;
 use Getopt::Long;				# manage options
 use File::Basename;				# dirname()
-use POSIX qw(strftime); 		# get the current year
+use POSIX qw(strftime mktime);	# date manipulation
 use File::Copy;					# move temp file to old one
+use File::Path;					# directories creation
 use Data::Uniqid qw(luniqid); 	# copy message into a temp file
 
 use constant MSG_FLAG_EXPUNGED => 0x0008 ;
@@ -14,29 +15,44 @@ $| = 1 ;
 
 my $start_time = time;
 
-my $year 	= strftime('%Y', localtime);
+my ($current_year,$current_mounth,$current_day,$current_week) = split(/-/,strftime('%Y-%m-%d-%W', localtime));
 my $uniqid 	= luniqid;
 
+# constant
+my %possible_split_value = qw/year 1 mounth 1 week 1 day 1/;
+my %mounths = qw/Jan 01 Feb 02 Mar 03 Apr 04 May 05 Jun 06 Jul 07 Aug 08 Sep 09 Oct 10 Nov 11 Dec 12/;
+
 # options
-my ($mbox,$dry_run,$compact,$help,$quiet);
-GetOptions('mbox=s'=>\$mbox, 'dry-run!'=>\$dry_run, 'compact!'=>\$compact, 'help|usage!'=>\$help, 'quiet!'=>\$quiet) ;
+my ($mbox,$dry_run,$split_by,$compact,$help,$quiet);
+GetOptions('mbox=s'=>\$mbox, 'dry-run!'=>\$dry_run, 'split-by=s'=>\$split_by, 'compact!'=>\$compact, 'help|usage!'=>\$help, 'quiet!'=>\$quiet) ;
 die <<EOT if ($help);
 Options :
---mbox=<mbox_file>
+--mbox=<mbox_file> (required)
 	The mbox file you want to inspect
+
 --dry-run
 	Do only a simulation, do not write anything
+
 --compact
-	Compact the mbox file (delete messages marked "deleted")
+	Compact the mbox file (delete messages marked as "deleted")
+
+--split-by=year|mounth|week|day
+	Split the mbox file into separate files
+
 --usage ou --help
 	Display this message
+
 --quiet
 	Don't print anything
 EOT
 
-# some check
+# some checks
 die "Option --mbox=<mbox_file> is needed" 	unless length($mbox)>0;
-die "Unable to find $mbox file" 			unless -e $mbox;
+die "Unable to find '$mbox' file" 			unless -e $mbox;
+my $must_split = length($split_by)>0 ? 1 : 0;
+if ($must_split) {
+	die "Option --split-by must be 'year', 'mounth', 'week' or 'day', not '$split_by'" unless exists $possible_split_value{$split_by};
+}
 
 # main program
 my $mbox_size = (stat($mbox))[7];
@@ -54,24 +70,72 @@ open(F,"<$mbox") or die "Could not open '$mbox' ($!)";
 while(<F>) { # foreach line
 	$line++;
 
-	if (/^From\s+-\s+\w{3}\s+\w{3}\s+\d{2}\s+\d{2}:\d{2}:\d{2}\s+(\d{4})\b/i) {  # new message syntax : From - Mon Jan 05 08:37:43 2012
+	if (/^From\s+-\s+\w{3}\s+(\w{3})\s+(\d{2})\s+\d{2}:\d{2}:\d{2}\s+(\d{4})\b/i) {  # new message syntax : From - Mon Jan 05 08:37:43 2012
 
 		print OUTPUT $buffer unless $dry_run || $skip_message; # write buffer into the output file
 
 		$buffer = '';		# reset buffer
 		$skip_message = 0; 	# reset deleted flag
 		$total_message++;
-		my $year_message = $1;
 
-		if ($year_message < $year) {
-			$total_moved_message++;
-			$ouput_mbox = "$mbox.sbd/$year_message";
-			mkdir "$mbox.sbd" or die "Could not create output directory '$mbox.sbd' ($!)" if !-d "$mbox.sbd" && !$dry_run;
-			$stats{$ouput_mbox}++;
-		} else {
-			$ouput_mbox = dirname($mbox).'/'.$uniqid;
+		my ($mounth_message,$day_message,$year_message) = ($1,$2,$3);
+			$mounth_message = $mounths{$mounth_message};
+		my 	$week_message = strftime('%W', 0, 0, 0, $day_message, $mounth_message, $year_message );
+
+		#print Dumper($_,$day_message, $mounth_message, $year_message,$week_message) ;
+
+		$ouput_mbox = dirname($mbox).'/'.$uniqid if !$must_split;
+
+		# split by year ?
+		if ($must_split && $split_by eq 'year') {
+			if ($year_message < $current_year) {
+				$total_moved_message++;
+				$ouput_mbox = "$mbox.sbd/$year_message";
+				mkpath("$mbox.sbd") if !$dry_run;
+				$stats{$ouput_mbox}++;
+			} else {
+				$ouput_mbox = dirname($mbox).'/'.$uniqid;
+			}
 		}
 
+		# split by mounth ?
+		elsif ($must_split && $split_by eq 'mounth') {
+			if ($year_message.$mounth_message < $current_year.$current_mounth) {
+				$total_moved_message++;
+				$ouput_mbox = "$mbox.sbd/$year_message.sbd/$mounth_message";
+				mkpath("$mbox.sbd/$year_message.sbd") if !$dry_run;
+				$stats{$ouput_mbox}++;
+			} else {
+				$ouput_mbox = dirname($mbox).'/'.$uniqid;
+			}
+		}
+
+		# split by day ?
+		elsif ($must_split && $split_by eq 'day') {
+			if ($year_message.$mounth_message.$day_message < $current_year.$current_mounth.$current_day) {
+				$total_moved_message++;
+				$ouput_mbox = "$mbox.sbd/$year_message.sbd/$mounth_message.sbd/$day_message";
+				mkpath("$mbox.sbd/$year_message.sbd/$mounth_message.sbd") if !$dry_run;
+				$stats{$ouput_mbox}++;
+			} else {
+				$ouput_mbox = dirname($mbox).'/'.$uniqid;
+			}
+		}
+
+		# split by week ?
+		elsif ($must_split && $split_by eq 'week') {
+			if ($year_message.$week_message < $current_year.$current_week) {
+				$total_moved_message++;
+				$ouput_mbox = "$mbox.sbd/$year_message.sbd/Week $week_message";
+				mkpath("$mbox.sbd/$year_message.sbd") if !$dry_run;
+				$stats{$ouput_mbox}++;
+			} else {
+				$ouput_mbox = dirname($mbox).'/'.$uniqid;
+			}
+		}
+
+
+		# check if we need to open a new file
 		if ($last_output_mbox ne $ouput_mbox) {
 			unless ($dry_run) { 
 				close(OUTPUT);
@@ -83,14 +147,7 @@ while(<F>) { # foreach line
 		draw_progress_bar($current_size_read, $mbox_size) unless $quiet;
 	}
 
-	if ($compact && /^X-Mozilla-Status:\s+(\d+)/i) { # check status of the message
-		my $status = hex("0x$1");
-		if ($status & MSG_FLAG_EXPUNGED) { # mark "deleted"
-			$skip_message = 1;
-			$total_deleted_message++;
-		}
-	}
-
+	# delete message ?
 	if ($compact && /^X-Mozilla-Status:\s+(\d+)/i) { # check status of the message
 		my $status = hex("0x$1");
 		if ($status & MSG_FLAG_EXPUNGED) { # mark "deleted"
@@ -130,7 +187,7 @@ unless ($dry_run) {
 	}
 }
 
-
+########################################################################################################
 sub draw_progress_bar($$) {
 	# first parameter is current value
 	# second paramater is total value
