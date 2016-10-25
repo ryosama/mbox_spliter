@@ -23,8 +23,9 @@ my %possible_split_value = qw/year 1 mounth 1 week 1 day 1/;
 my %mounths = qw/Jan 01 Feb 02 Mar 03 Apr 04 May 05 Jun 06 Jul 07 Aug 08 Sep 09 Oct 10 Nov 11 Dec 12/;
 
 # options
-my ($mbox,$dry_run,$split_by,$compact,$help,$quiet);
-GetOptions('mbox=s'=>\$mbox, 'dry-run!'=>\$dry_run, 'split-by=s'=>\$split_by, 'compact!'=>\$compact, 'help|usage!'=>\$help, 'quiet!'=>\$quiet) ;
+my ($mbox,$dry_run,$split_by,$compact,$delete_older_than,$help,$quiet);
+GetOptions(	'mbox=s'=>\$mbox, 'dry-run!'=>\$dry_run, 'split-by=s'=>\$split_by, 'compact!'=>\$compact,
+			'delete-older-than=s'=>\$delete_older_than, 'help|usage!'=>\$help, 'quiet!'=>\$quiet) ;
 die <<EOT if ($help);
 Options :
 --mbox=<mbox_file> (required)
@@ -36,6 +37,9 @@ Options :
 --compact
 	Compact the mbox file (delete messages marked as "deleted")
 
+--delete-older-than=yyyy-mm-dd
+	Delete messages older than this date
+
 --split-by=year|mounth|week|day
 	Split the mbox file into separate files
 
@@ -46,7 +50,7 @@ Options :
 	Don't print anything
 EOT
 
-# some checks
+# some options checks
 die "Option --mbox=<mbox_file> is needed" 	unless length($mbox)>0;
 die "Unable to find '$mbox' file" 			unless -e $mbox;
 my $must_split = length($split_by)>0 ? 1 : 0;
@@ -54,8 +58,13 @@ if ($must_split) {
 	die "Option --split-by must be 'year', 'mounth', 'week' or 'day', not '$split_by'" unless exists $possible_split_value{$split_by};
 }
 
+if (length($delete_older_than)>0 && $delete_older_than !~ /^\d{4}-\d{2}-\d{2}$/) {
+	die "Option --delete-older-than must be in format yyyy-mm-dd not '$delete_older_than'" ;
+}
+
 # main program
 my $mbox_size = (stat($mbox))[7];
+   $delete_older_than =~ s/-//g; # clean up option (remove '-')
 my $buffer = ''; # buffer for current message
 my $skip_message = 0;
 my $ouput_mbox = dirname($mbox).'/'.$uniqid;
@@ -75,14 +84,20 @@ while(<F>) { # foreach line
 		print OUTPUT $buffer unless $dry_run || $skip_message; # write buffer into the output file
 
 		$buffer = '';		# reset buffer
-		$skip_message = 0; 	# reset deleted flag
 		$total_message++;
 
 		my ($mounth_message,$day_message,$year_message) = ($1,$2,$3);
 			$mounth_message = $mounths{$mounth_message};
 		my 	$week_message = strftime('%W', 0, 0, 0, $day_message, $mounth_message, $year_message );
-
 		#print Dumper($_,$day_message, $mounth_message, $year_message,$week_message) ;
+
+		my $date_message = $year_message.$mounth_message.$day_message;
+		if (length($delete_older_than)>0 && $delete_older_than > $date_message) { # message is too old --> delete
+			$skip_message = 1;
+			$total_deleted_message++;
+		} else {
+			$skip_message = 0; 	# reset deleted flag
+		}
 
 		$ouput_mbox = dirname($mbox).'/'.$uniqid if !$must_split;
 
@@ -169,7 +184,7 @@ unless ($quiet) {
 	printf "\n-----------------Statistics-----------------\n";
 	printf "Read  %d lines in %d seconds\n", $line, time() - $start_time;
 	printf "Found   %5d messages\n", $total_message ;
-	printf "Compact %5d messages (%4.1f%%)\n", $total_deleted_message, $total_deleted_message/$total_message * 100 if $compact;
+	printf "Delete  %5d messages (%4.1f%%)\n", $total_deleted_message, $total_deleted_message/$total_message * 100 if $compact || length($delete_older_than)>0;
 	printf "Keep    %5d messages (%4.1f%%)\n", $total_message - $total_moved_message, ($total_message - $total_moved_message)/$total_message * 100 ;
 	printf "Moved   %5d messages (%4.1f%%)\n", $total_moved_message, $total_moved_message/$total_message * 100 ;
 	printf "\t%5d messages (%4.1f%%) into $_\n", $stats{$_}, $stats{$_}/$total_message * 100 foreach (keys %stats) ;
