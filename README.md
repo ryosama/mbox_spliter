@@ -14,6 +14,9 @@ Options :
 --compact
   Compact the mbox file (delete messages marked as "deleted")
 
+--delete-older-than=yyyy-mm-dd
+  Delete messages older than this date
+
 --split-by=year|mounth|week|day
   Split the mbox file into separate files
 
