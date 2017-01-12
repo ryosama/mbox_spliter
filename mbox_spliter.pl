@@ -63,7 +63,9 @@ if (length($delete_older_than)>0 && $delete_older_than !~ /^\d{4}-\d{2}-\d{2}$/)
 }
 
 # main program
-my $mbox_size = (stat($mbox))[7];
+# save file permission
+my @stats 		= stat($mbox);
+my $mbox_size 	= $stats[7];
    $delete_older_than =~ s/-//g; # clean up option (remove '-')
 my $buffer = ''; # buffer for current message
 my $skip_message = 0;
@@ -74,7 +76,8 @@ my %stats = ();
 my $current_size_read = 0;
 my $line = 0 ;
 
-open(OUTPUT,">>$ouput_mbox") or die "Could not write into '$ouput_mbox' ($!)" unless $dry_run; 
+open(OUTPUT,">>$ouput_mbox") or die "Could not write into '$ouput_mbox' ($!)" unless $dry_run;
+restore_perm_and_owner($ouput_mbox);
 open(F,"<$mbox") or die "Could not open '$mbox' ($!)";
 while(<F>) { # foreach line
 	$line++;
@@ -106,7 +109,10 @@ while(<F>) { # foreach line
 			if ($year_message < $current_year) {
 				$total_moved_message++;
 				$ouput_mbox = "$mbox.sbd/$year_message";
-				mkpath("$mbox.sbd") if !$dry_run;
+				if (!$dry_run) {
+					mkpath("$mbox.sbd");
+					restore_perm_and_owner("$mbox.sbd");
+				}
 				$stats{$ouput_mbox}++;
 			} else {
 				$ouput_mbox = dirname($mbox).'/'.$uniqid;
@@ -118,7 +124,10 @@ while(<F>) { # foreach line
 			if ($year_message.$mounth_message < $current_year.$current_mounth) {
 				$total_moved_message++;
 				$ouput_mbox = "$mbox.sbd/$year_message.sbd/$mounth_message";
-				mkpath("$mbox.sbd/$year_message.sbd") if !$dry_run;
+				if (!$dry_run) {
+					mkpath("$mbox.sbd/$year_message.sbd");
+					restore_perm_and_owner("$mbox.sbd/$year_message.sbd");
+				}
 				$stats{$ouput_mbox}++;
 			} else {
 				$ouput_mbox = dirname($mbox).'/'.$uniqid;
@@ -130,7 +139,10 @@ while(<F>) { # foreach line
 			if ($year_message.$mounth_message.$day_message < $current_year.$current_mounth.$current_day) {
 				$total_moved_message++;
 				$ouput_mbox = "$mbox.sbd/$year_message.sbd/$mounth_message.sbd/$day_message";
-				mkpath("$mbox.sbd/$year_message.sbd/$mounth_message.sbd") if !$dry_run;
+				if (!$dry_run) {
+					mkpath("$mbox.sbd/$year_message.sbd/$mounth_message.sbd");
+					restore_perm_and_owner("$mbox.sbd/$year_message.sbd/$mounth_message.sbd");
+				}
 				$stats{$ouput_mbox}++;
 			} else {
 				$ouput_mbox = dirname($mbox).'/'.$uniqid;
@@ -142,7 +154,10 @@ while(<F>) { # foreach line
 			if ($year_message.$week_message < $current_year.$current_week) {
 				$total_moved_message++;
 				$ouput_mbox = "$mbox.sbd/$year_message.sbd/Week $week_message";
-				mkpath("$mbox.sbd/$year_message.sbd") if !$dry_run;
+				if (!$dry_run) {
+					mkpath("$mbox.sbd/$year_message.sbd");
+					restore_perm_and_owner("$mbox.sbd/$year_message.sbd");
+				}
 				$stats{$ouput_mbox}++;
 			} else {
 				$ouput_mbox = dirname($mbox).'/'.$uniqid;
@@ -155,6 +170,7 @@ while(<F>) { # foreach line
 			unless ($dry_run) { 
 				close(OUTPUT);
 				open(OUTPUT,">>$ouput_mbox") or die "Could not write into '$ouput_mbox' ($!)";
+				restore_perm_and_owner($ouput_mbox);
 			}
 		}
 
@@ -194,6 +210,7 @@ unless ($quiet) {
 unless ($dry_run) {
 	unlink($mbox) 							or die "Could not delete '$mbox' ($!)";
 	move(dirname($mbox).'/'.$uniqid, $mbox) or die "Could not rename '$uniqid' into '$mbox' ($!)";
+	restore_perm_and_owner($mbox);
 
 	# clean up index .msf file
 	if (-e "$mbox.msf") {
@@ -203,6 +220,17 @@ unless ($dry_run) {
 }
 
 ########################################################################################################
+
+sub restore_perm_and_owner($) {
+	# first parameter is the file
+	my ($filename) = shift;
+
+	# restore file permission
+	chown($stats[4], $stats[5], $filename)	or die "Cound not restore file owner on '$filename' ($!)";
+	chmod($stats[2], $filename) 			or die "Cound not restore file permission on '$filename' ($!)";
+}
+
+
 sub draw_progress_bar($$) {
 	# first parameter is current value
 	# second paramater is total value
