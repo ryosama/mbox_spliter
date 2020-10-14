@@ -15,17 +15,17 @@ $| = 1 ;
 
 my $start_time = time;
 
-my ($current_year,$current_mounth,$current_day,$current_week) = split(/-/,strftime('%Y-%m-%d-%W', localtime));
+my ($current_year,$current_month,$current_day,$current_week) = split(/-/,strftime('%Y-%m-%d-%W', localtime));
 my $uniqid 	= luniqid;
 
 # constant
-my %possible_split_value = qw/year 1 mounth 1 week 1 day 1/;
-my %mounths = qw/Jan 01 Feb 02 Mar 03 Apr 04 May 05 Jun 06 Jul 07 Aug 08 Sep 09 Oct 10 Nov 11 Dec 12/;
+my %possible_split_value = qw/year 1 month 1 week 1 day 1/;
+my %months = qw/Jan 01 Feb 02 Mar 03 Apr 04 May 05 Jun 06 Jul 07 Aug 08 Sep 09 Oct 10 Nov 11 Dec 12/;
 
 # options
 my ($mbox,$dry_run,$split_by,$compact,$delete_older_than,$help,$quiet);
 GetOptions(	'mbox=s'=>\$mbox, 'dry-run!'=>\$dry_run, 'split-by=s'=>\$split_by, 'compact!'=>\$compact,
-			'delete-older-than=s'=>\$delete_older_than, 'help|usage!'=>\$help, 'quiet!'=>\$quiet) ;
+			'delete-older-than|remove-older-than=s'=>\$delete_older_than, 'help|usage!'=>\$help, 'quiet!'=>\$quiet) ;
 die <<EOT if ($help);
 Options :
 --mbox=<mbox_file> (required)
@@ -40,7 +40,7 @@ Options :
 --delete-older-than=yyyy-mm-dd
 	Delete messages older than this date
 
---split-by=year|mounth|week|day
+--split-by=year|month|week|day
 	Split the mbox file into separate files
 
 --usage ou --help
@@ -55,7 +55,7 @@ die "Option --mbox=<mbox_file> is needed" 	unless length($mbox)>0;
 die "Unable to find '$mbox' file" 			unless -e $mbox;
 my $must_split = length($split_by)>0 ? 1 : 0;
 if ($must_split) {
-	die "Option --split-by must be 'year', 'mounth', 'week' or 'day', not '$split_by'" unless exists $possible_split_value{$split_by};
+	die "Option --split-by must be 'year', 'month', 'week' or 'day', not '$split_by'" unless exists $possible_split_value{$split_by};
 }
 
 if (length($delete_older_than)>0 && $delete_older_than !~ /^\d{4}-\d{2}-\d{2}$/) {
@@ -89,12 +89,12 @@ while(<F>) { # foreach line
 		$buffer = '';		# reset buffer
 		$total_message++;
 
-		my ($mounth_message,$day_message,$year_message) = ($1,$2,$3);
-			$mounth_message = $mounths{$mounth_message};
-		my 	$week_message = strftime('%W', 0, 0, 0, $day_message, $mounth_message, $year_message );
-		#print Dumper($_,$day_message, $mounth_message, $year_message,$week_message) ;
+		my ($month_message,$day_message,$year_message) = ($1,$2,$3);
+			$month_message = $months{$month_message};
+		my 	$week_message = strftime('%W', 0, 0, 0, $day_message, $month_message, $year_message );
+		#print Dumper($_,$day_message, $month_message, $year_message,$week_message) ;
 
-		my $date_message = $year_message.$mounth_message.$day_message;
+		my $date_message = $year_message.$month_message.$day_message;
 		if (length($delete_older_than)>0 && $delete_older_than > $date_message) { # message is too old --> delete
 			$skip_message = 1;
 			$total_deleted_message++;
@@ -119,11 +119,11 @@ while(<F>) { # foreach line
 			}
 		}
 
-		# split by mounth ?
-		elsif ($must_split && $split_by eq 'mounth') {
-			if ($year_message.$mounth_message < $current_year.$current_mounth) {
+		# split by month ?
+		elsif ($must_split && $split_by eq 'month') {
+			if ($year_message.$month_message < $current_year.$current_month) {
 				$total_moved_message++;
-				$ouput_mbox = "$mbox.sbd/$year_message.sbd/$mounth_message";
+				$ouput_mbox = "$mbox.sbd/$year_message.sbd/$month_message";
 				if (!$dry_run) {
 					mkpath("$mbox.sbd/$year_message.sbd");
 					restore_perm_and_owner("$mbox.sbd/$year_message.sbd");
@@ -136,12 +136,12 @@ while(<F>) { # foreach line
 
 		# split by day ?
 		elsif ($must_split && $split_by eq 'day') {
-			if ($year_message.$mounth_message.$day_message < $current_year.$current_mounth.$current_day) {
+			if ($year_message.$month_message.$day_message < $current_year.$current_month.$current_day) {
 				$total_moved_message++;
-				$ouput_mbox = "$mbox.sbd/$year_message.sbd/$mounth_message.sbd/$day_message";
+				$ouput_mbox = "$mbox.sbd/$year_message.sbd/$month_message.sbd/$day_message";
 				if (!$dry_run) {
-					mkpath("$mbox.sbd/$year_message.sbd/$mounth_message.sbd");
-					restore_perm_and_owner("$mbox.sbd/$year_message.sbd/$mounth_message.sbd");
+					mkpath("$mbox.sbd/$year_message.sbd/$month_message.sbd");
+					restore_perm_and_owner("$mbox.sbd/$year_message.sbd/$month_message.sbd");
 				}
 				$stats{$ouput_mbox}++;
 			} else {
@@ -199,10 +199,10 @@ draw_progress_bar($mbox_size, $mbox_size) unless $quiet;
 unless ($quiet) {
 	printf "\n-----------------Statistics-----------------\n";
 	printf "Read  %d lines in %d seconds\n", $line, time() - $start_time;
-	printf "Found   %5d messages\n", $total_message ;
-	printf "Delete  %5d messages (%4.1f%%)\n", $total_deleted_message, $total_deleted_message/$total_message * 100 if $compact || length($delete_older_than)>0;
-	printf "Keep    %5d messages (%4.1f%%)\n", $total_message - $total_moved_message, ($total_message - $total_moved_message)/$total_message * 100 ;
-	printf "Moved   %5d messages (%4.1f%%)\n", $total_moved_message, $total_moved_message/$total_message * 100 ;
+	printf "Found     %5d messages\n", $total_message ;
+	printf "Delete    %5d messages (%4.1f%%)\n", $total_deleted_message, $total_deleted_message/$total_message * 100 if $compact || length($delete_older_than)>0;
+	printf "Untouched %5d messages (%4.1f%%)\n", $total_message - ($total_moved_message+$total_deleted_message), ($total_message - ($total_moved_message+$total_deleted_message))/$total_message * 100 ;
+	printf "Moved     %5d messages (%4.1f%%)\n", $total_moved_message, $total_moved_message/$total_message * 100 ;
 	printf "\t%5d messages (%4.1f%%) into $_\n", $stats{$_}, $stats{$_}/$total_message * 100 foreach (keys %stats) ;
 }
 
@@ -226,8 +226,10 @@ sub restore_perm_and_owner($) {
 	my ($filename) = shift;
 
 	# restore file permission
-	chown($stats[4], $stats[5], $filename)	or die "Cound not restore file owner on '$filename' ($!)";
-	chmod($stats[2], $filename) 			or die "Cound not restore file permission on '$filename' ($!)";
+	if (-e $filename) {
+		chown($stats[4], $stats[5], $filename)	or warn "Could not restore file owner on '$filename' ($!)";
+		chmod($stats[2], $filename) 			or warn "Could not restore file permission on '$filename' ($!)";
+	}
 }
 
 
