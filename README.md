@@ -1,39 +1,31 @@
 # mbox_spliter
---------------
-Split large mbox files (from Mozilla Thunderbird) into smaller one
+Split large mbox files (from _Mozilla Thunderbird_) into smaller one
 
 # Usage
--------
+
 Options :
---mbox=<mbox_file> (required)
-  The mbox file you want to inspect
 
---dry-run
-  Do only a simulation, do not write anything
+* __--mbox__=<mbox_file> (required) The mbox file you want to inspect
 
---compact
-  Compact the mbox file (delete messages marked as "deleted")
+* __--dry-run__ Do only a simulation, do not write anything
 
---delete-older-than=yyyy-mm-dd
-  Delete messages older than this date
+* __--compact__ Compact the mbox file (delete messages marked as "deleted")
 
---split-by=year|mounth|week|day
-  Split the mbox file into separate files
+* __--delete-older-than__=_yyyy-mm-dd_ Delete messages older than this date
 
---usage ou --help
-  Display this message
+* __--split-by__=_year|mounth|week|day_  Split the mbox file into separate files
 
---quiet
-  Don't print anything
+* __--usage__ or __--help__ Display this message
+
+* __--quiet__ Don't print anything
 
 
 # Examples
-----------
 `perl mbox_spliter.pl --dry-run --mbox=c:/Thunderbird/Mail/Inbox` --compact --split-by=year
 
 # Statistics
-------------
 At the end the script print some statitics about the job done
+```
 
 -----------------Statistics-----------------
 
@@ -58,3 +50,4 @@ Moved     364 messages (84.5%)
             1 messages ( 0.2%) into /home/foo/.Mail/Local Folders/Sent.sbd/2012
 
            33 messages ( 7.7%) into /home/foo/.Mail/Local Folders/Sent.sbd/2011
+```
